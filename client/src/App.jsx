@@ -5,7 +5,7 @@ import {
   ArrowRight, ShieldCheck, Zap, BarChart3, LogIn, UserPlus,
   LogOut, Sun, Moon, Menu, X, ChevronDown, HelpCircle,
   Layers, Cpu, Award, Copy, Check, Wand2, CheckCircle,
-  Activity, Code2, Briefcase, Compass
+  Activity, Briefcase, Compass
 } from 'lucide-react';
 
 // --- TOAST NOTIFICATION COMPONENT ---
@@ -66,6 +66,7 @@ function Navbar({ user, setUser, darkMode, setDarkMode }) {
       <div 
         className="fixed left-0 top-0 h-16 z-50 flex items-center px-3 cursor-pointer group"
         onMouseEnter={() => setSidebarOpen(true)}
+        onClick={() => setSidebarOpen(true)}
       >
         <div className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 group-hover:border-indigo-500 group-hover:text-indigo-500 transition shadow-lg">
           <Menu className="w-5 h-5" />
@@ -152,7 +153,7 @@ function Navbar({ user, setUser, darkMode, setDarkMode }) {
           </div>
 
           {/* Right Actions */}
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="flex items-center space-x-3">
             <button
               type="button"
               onClick={() => setDarkMode(!darkMode)}
@@ -167,25 +168,25 @@ function Navbar({ user, setUser, darkMode, setDarkMode }) {
                 <div className="w-8 h-8 rounded-full bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{user.name}</span>
+                <span className="hidden sm:inline text-sm font-medium text-slate-700 dark:text-slate-200">{user.name}</span>
                 <button
                   type="button"
                   onClick={() => setUser(null)}
                   className="flex items-center space-x-1 text-xs font-medium px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-500 transition cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
+                  <span className="hidden sm:inline">Sign Out</span>
                 </button>
               </div>
             ) : (
-              <>
+              <div className="hidden sm:flex items-center space-x-2">
                 <Link to="/auth?mode=login" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 transition">
                   Log in
                 </Link>
                 <Link to="/auth?mode=register" className="text-sm font-semibold px-4 py-2.5 rounded-xl bg-linear-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all">
                   Get Started Free
                 </Link>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -307,6 +308,7 @@ function Navbar({ user, setUser, darkMode, setDarkMode }) {
     </>
   );
 }
+
 // --- 2. LANDING PAGE WITH GRID MESH & FLOATING LIVE PREVIEW ---
 function LandingPage() {
   const [openFaq, setOpenFaq] = useState(0);
@@ -640,7 +642,7 @@ function AuthPage({ setUser, showToast }) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Alex Morgan"
+                placeholder="Naman Sharma"
                 className="w-full rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
               />
             </div>
@@ -735,8 +737,9 @@ const EXPERIENCE_LEVELS = [
   { id: 'senior', label: 'Senior / Lead', years: '5+ Years', expectation: 'high-scale distributed design, cross-team technical leadership, and architectural decision-making' }
 ];
 
-// --- 4. SCANNER WORKSPACE WITH SMART JD BUILDER & SIDE DRAWER ---
+// --- 4. SCANNER WORKSPACE WITH SMART JD BUILDER, SIDE DRAWER & WHAT-IF SIMULATOR ---
 function ScannerPage({ showToast }) {
+  const [simulatedSkills, setSimulatedSkills] = useState([]);
   const [inputMode, setInputMode] = useState('pdf');
   const [jdMode, setJdMode] = useState('builder'); // 'builder' | 'custom'
   const [selectedRole, setSelectedRole] = useState('Full-Stack Software Engineer');
@@ -803,25 +806,55 @@ function ScannerPage({ showToast }) {
     return () => clearInterval(interval);
   }, [loading]);
 
+  // Toggle a missing skill on/off in the What-If Simulator
+  const toggleSimulatedSkill = (skill) => {
+    setSimulatedSkills((prev) => {
+      const exists = prev.includes(skill);
+      const updated = exists ? prev.filter((s) => s !== skill) : [...prev, skill];
+      showToast(
+        exists
+          ? `Removed "${skill}" from score simulation`
+          : `Simulated adding "${skill}" to your resume!`
+      );
+      return updated;
+    });
+  };
+
+  // Calculate base score + simulated boost dynamically
+  const baseScore = result?.matchScore || 0;
+  const totalMissing = result?.missingSkills?.length || 0;
+  const remainingRoom = Math.max(0, 98 - baseScore);
+  const scoreBoost =
+    totalMissing > 0
+      ? Math.round((simulatedSkills.length / totalMissing) * remainingRoom)
+      : 0;
+  const effectiveScore = Math.min(99, baseScore + scoreBoost);
+
+  // Smoothly animate the SVG ring whenever effectiveScore changes
   useEffect(() => {
     if (!result) {
       setAnimatedScore(0);
       return;
     }
-    let current = 0;
-    const target = result.matchScore || 0;
-    const step = Math.max(1, Math.ceil(target / 30));
+    let current = animatedScore;
+    const target = effectiveScore;
+    if (current === target) return;
+
+    const direction = target > current ? 1 : -1;
+    const step = Math.max(1, Math.ceil(Math.abs(target - current) / 20));
+
     const timer = setInterval(() => {
-      current += step;
-      if (current >= target) {
+      current += direction * step;
+      if ((direction === 1 && current >= target) || (direction === -1 && current <= target)) {
         setAnimatedScore(target);
         clearInterval(timer);
       } else {
         setAnimatedScore(current);
       }
-    }, 25);
+    }, 20);
+
     return () => clearInterval(timer);
-  }, [result]);
+  }, [result, effectiveScore]);
 
   const loadSampleData = () => {
     setInputMode('text');
@@ -866,6 +899,7 @@ function ScannerPage({ showToast }) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setSimulatedSkills([]);
 
     try {
       const formData = new FormData();
@@ -976,6 +1010,7 @@ function ScannerPage({ showToast }) {
                       onClick={() => {
                         setResult(item.data);
                         setSideDrawerOpen(false);
+                        setSimulatedSkills([]);
                         showToast(`Loaded scan: ${item.role}`);
                       }}
                       className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/50 cursor-pointer transition space-y-1"
@@ -1343,11 +1378,19 @@ function ScannerPage({ showToast }) {
             <div className="space-y-6 animate-fade-in">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* Animated Score Gauge */}
+                {/* Animated Score Gauge with What-If Boost Indicator */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3 shadow-sm">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    ATS Compatibility Score
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      ATS Compatibility Score
+                    </span>
+                    {scoreBoost > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-fade-in">
+                        +{scoreBoost}% Boost
+                      </span>
+                    )}
+                  </div>
+
                   <div className="relative flex items-center justify-center">
                     <svg className="w-36 h-36 -rotate-90 transform">
                       <circle
@@ -1369,17 +1412,29 @@ function ScannerPage({ showToast }) {
                         strokeDashoffset={strokeDashoffset}
                         strokeLinecap="round"
                         fill="transparent"
-                        className="text-indigo-600 dark:text-indigo-400 transition-all duration-300 ease-out"
+                        className={`${
+                          scoreBoost > 0
+                            ? 'text-emerald-500 dark:text-emerald-400'
+                            : 'text-indigo-600 dark:text-indigo-400'
+                        } transition-all duration-300 ease-out`}
                       />
                     </svg>
-                    <span className="absolute text-3xl font-extrabold text-slate-900 dark:text-white">
-                      {animatedScore}%
-                    </span>
+                    <div className="absolute flex flex-col items-center">
+                      <span className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                        {animatedScore}%
+                      </span>
+                      {scoreBoost > 0 && (
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          Base: {baseScore}%
+                        </span>
+                      )}
+                    </div>
                   </div>
+
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {result.matchScore >= 75
+                    {effectiveScore >= 75
                       ? 'Strong match! Ready for application.'
-                      : 'Add the missing keywords below to boost your ranking.'}
+                      : 'Click missing keywords on the right to simulate adding them!'}
                   </p>
                 </div>
 
@@ -1393,7 +1448,7 @@ function ScannerPage({ showToast }) {
                     {result.matchedSkills?.map((skill, idx) => (
                       <span
                         key={idx}
-                        className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80"
+                        className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                       >
                         ✓ {skill}
                       </span>
@@ -1401,21 +1456,46 @@ function ScannerPage({ showToast }) {
                   </div>
                 </div>
 
-                {/* Missing Skills */}
+                {/* Interactive "What-If" Missing Skills Simulator */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
-                  <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Missing Keywords ({result.missingSkills?.length || 0})
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {result.missingSkills?.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80"
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Missing Keywords ({result.missingSkills?.length || 0})
+                    </h3>
+                    {simulatedSkills.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSimulatedSkills([])}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-indigo-500 cursor-pointer"
                       >
-                        + {skill}
-                      </span>
-                    ))}
+                        Reset ({simulatedSkills.length})
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    💡 Click any missing skill below to simulate adding it to your resume:
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {result.missingSkills?.map((skill, idx) => {
+                      const isSimulated = simulatedSkills.includes(skill);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => toggleSimulatedSkill(skill)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer hover:scale-105 ${
+                            isSimulated
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500 shadow-xs'
+                              : 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:border-amber-500'
+                          }`}
+                        >
+                          {isSimulated ? `✓ ${skill} (Added)` : `+ ${skill}`}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
